@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能菜地监控系统</title>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.6.1/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+    --bg: #0f172a; --card: #1e293b; --accent: #22c55e;
+    --text: #e2e8f0; --sub: #94a3b8; --danger: #ef4444; --warn: #f59e0b;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    padding: 12px;
+}
+.header {
+    text-align: center; padding: 16px 0;
+    border-bottom: 1px solid #334155; margin-bottom: 16px;
+}
+.header h1 { font-size: 1.4rem; color: var(--accent); }
+.header .status { font-size: 0.8rem; color: var(--sub); margin-top: 4px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.dot-on { background: var(--accent); }
+.dot-off { background: var(--danger); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.card {
+    background: var(--card); border-radius: 10px; padding: 14px;
+    text-align: center;
+}
+.card .label { font-size: 0.75rem; color: var(--sub); text-transform: uppercase; }
+.card .value { font-size: 1.8rem; font-weight: 700; margin: 6px 0; }
+.card .unit { font-size: 0.7rem; color: var(--sub); }
+.card.soil .value { color: #60a5fa; }
+.card.temp .value { color: #f97316; }
+.card.humi .value { color: #38bdf8; }
+.card.light .value { color: #fbbf24; }
+
+.controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
+.ctrl-card {
+    background: var(--card); border-radius: 10px; padding: 14px; text-align: center;
+}
+.ctrl-card .name { font-weight: 600; margin-bottom: 8px; }
+.ctrl-card .state { font-size: 0.8rem; margin-bottom: 8px; }
+.btn {
+    border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.85rem;
+    font-weight: 600; cursor: pointer; margin: 2px 4px; transition: opacity 0.2s;
+}
+.btn:active { opacity: 0.7; }
+.btn-on { background: var(--accent); color: #000; }
+.btn-off { background: #475569; color: #e2e8f0; }
+.btn-mode { background: #6366f1; color: #fff; width: 100%; margin-top: 6px; }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.row2 .card { text-align: left; }
+
+.chart-box {
+    background: var(--card); border-radius: 10px; padding: 14px; margin-top: 10px;
+}
+.chart-box canvas { max-height: 200px; }
+
+.info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.info-item {
+    background: var(--card); border-radius: 8px; padding: 10px; text-align: center;
+    font-size: 0.75rem; color: var(--sub);
+}
+.info-item span { display: block; font-size: 0.9rem; color: var(--text); font-weight: 600; }
+
+.footer { text-align: center; font-size: 0.7rem; color: #475569; margin-top: 12px; }
+
+/* MQTT 配置浮层 */
+.config-bar {
+    background: var(--card); border-radius: 8px; padding: 8px 12px;
+    margin-bottom: 10px; display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap; font-size: 0.8rem;
+}
+.config-bar input {
+    background: #0f172a; border: 1px solid #334155; color: var(--text);
+    padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;
+}
+.config-bar input[type="text"] { width: 180px; }
+.config-bar button {
+    background: var(--accent); color: #000; border: none; padding: 5px 12px;
+    border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.8rem;
+}
+
+@media (max-width: 480px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .controls { grid-template-columns: repeat(3, 1fr); }
+    .row2 { grid-template-columns: 1fr; }
+    .info-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🌱 智能菜地监控系统</h1>
+    <div class="status">
+        <span id="mqttStatus"><span class="dot dot-off"></span>MQTT 未连接</span>
+        &nbsp;|&nbsp; 设备: <strong>vegfield_001</strong>
+    </div>
+</div>
+
+<div class="config-bar">
+    <span>MQTT Broker:</span>
+    <input type="text" id="brokerUrl" value="wss://broker.emqx.io:8084/mqtt">
+    <input type="text" id="deviceId" value="vegfield_001" style="width:120px">
+    <button onclick="doConnect()">连接</button>
+    <span id="connInfo" style="color:var(--sub);font-size:0.7rem">点击连接</span>
+</div>
+
+<!-- 传感器数据 -->
+<div class="grid">
+    <div class="card soil"><div class="label">土壤湿度 #1</div>
+        <div class="value" id="soil1">--</div><div class="unit">%</div></div>
+    <div class="card soil"><div class="label">土壤湿度 #2</div>
+        <div class="value" id="soil2">--</div><div class="unit">%</div></div>
+    <div class="card temp"><div class="label">空气温度</div>
+        <div class="value" id="temp">--</div><div class="unit">°C</div></div>
+    <div class="card humi"><div class="label">空气湿度</div>
+        <div class="value" id="humi">--</div><div class="unit">%RH</div></div>
+    <div class="card light"><div class="label">光照强度</div>
+        <div class="value" id="lux">--</div><div class="unit">lux</div></div>
+    <div class="card"><div class="label">降雨</div>
+        <div class="value" id="rain">--</div><div class="unit"></div></div>
+    <div class="card temp"><div class="label">土壤温度</div>
+        <div class="value" id="soilTemp">--</div><div class="unit">°C</div></div>
+    <div class="card"><div class="label">氮 N</div>
+        <div class="value" id="npkN">--</div><div class="unit">mg/kg</div></div>
+    <div class="card"><div class="label">磷 P</div>
+        <div class="value" id="npkP">--</div><div class="unit">mg/kg</div></div>
+    <div class="card"><div class="label">钾 K</div>
+        <div class="value" id="npkK">--</div><div class="unit">mg/kg</div></div>
+</div>
+
+<!-- 执行器控制 -->
+<div class="controls">
+    <div class="ctrl-card">
+        <div class="name">💧 水泵</div>
+        <div class="state" id="pumpState">关闭</div>
+        <button class="btn btn-on" onclick="sendCmd('pump_on')">开启</button>
+        <button class="btn btn-off" onclick="sendCmd('pump_off')">关闭</button>
+    </div>
+    <div class="ctrl-card">
+        <div class="name">💡 补光灯</div>
+        <div class="state" id="ledState">关闭</div>
+        <button class="btn btn-on" onclick="sendCmd('led_on')">开启</button>
+        <button class="btn btn-off" onclick="sendCmd('led_off')">关闭</button>
+    </div>
+    <div class="ctrl-card">
+        <div class="name">🌀 风扇</div>
+        <div class="state" id="fanState">关闭</div>
+        <button class="btn btn-on" onclick="sendCmd('fan_on')">开启</button>
+        <button class="btn btn-off" onclick="sendCmd('fan_off')">关闭</button>
+    </div>
+</div>
+
+<!-- 模式切换 -->
+<div style="text-align:center;margin:6px 0">
+    当前模式: <strong id="modeLabel">AUTO</strong>
+    <button class="btn btn-mode" onclick="sendCmd('auto_mode')">切换为自动</button>
+    <button class="btn btn-mode" onclick="sendCmd('manual_mode')">切换为手动</button>
+</div>
+
+<!-- 图表 -->
+<div class="chart-box">
+    <canvas id="chart"></canvas>
+</div>
+
+<!-- 系统信息 -->
+<div class="info-grid">
+    <div class="info-item">WiFi <span id="wifiStatus">--</span></div>
+    <div class="info-item">MQTT <span id="mqttOk">--</span></div>
+    <div class="info-item">运行时间 <span id="uptime">--</span></div>
+    <div class="info-item">累计灌溉 <span id="irrigCount">--</span></div>
+</div>
+
+<div class="footer">Smart Vegetable Field v1.0 | STM32F103C8T6 + FreeRTOS</div>
+
+<script>
+/* ============ 配置 ============ */
+let client = null;
+let history = { soil1: [], soil2: [], temp: [], humi: [], time: [] };
+const MAX_HISTORY = 30;
+const DEFAULT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+const DEVICE = 'vegfield_001';
+
+/* ============ Chart.js ============ */
+const ctx = document.getElementById('chart').getContext('2d');
+let chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            { label: '土壤#1 (%)', data: [], borderColor: '#60a5fa', tension: 0.2, pointRadius: 0 },
+            { label: '土壤#2 (%)', data: [], borderColor: '#818cf8', tension: 0.2, pointRadius: 0 },
+            { label: '温度 (°C)',  data: [], borderColor: '#f97316', tension: 0.2, pointRadius: 0, hidden: true },
+            { label: '湿度 (%RH)', data: [], borderColor: '#38bdf8', tension: 0.2, pointRadius: 0, hidden: true }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: { ticks: { color: '#64748b', maxTicksLimit: 8 } },
+            y: { min: 0, max: 100, ticks: { color: '#64748b' } }
+        },
+        plugins: { legend: { labels: { color: '#94a3b8', usePointStyle: true, boxWidth: 8 } } }
+    }
+});
+
+/* ============ MQTT ============ */
+function doConnect() {
+    const url = document.getElementById('brokerUrl').value || DEFAULT_BROKER;
+    const dev = document.getElementById('deviceId').value || DEVICE;
+
+    if (client) { client.end(true); }
+
+    document.getElementById('connInfo').textContent = '连接中...';
+    client = mqtt.connect(url, {
+        clientId: 'web_' + Math.random().toString(16).slice(2, 10),
+        keepalive: 60,
+        clean: true
+    });
+
+    client.on('connect', () => {
+        document.getElementById('mqttStatus').innerHTML = '<span class="dot dot-on"></span>MQTT 已连接';
+        document.getElementById('connInfo').textContent = '✅ 已连接';
+        client.subscribe(`vegfield/${dev}/data`, { qos: 1 });
+        client.subscribe(`vegfield/${dev}/event`, { qos: 1 });
+        client.subscribe(`vegfield/${dev}/status`, { qos: 1 });
+    });
+
+    client.on('message', (topic, payload) => {
+        try {
+            const msg = JSON.parse(payload.toString());
+            if (topic.endsWith('/data')) handleData(msg);
+            else if (topic.endsWith('/event')) handleEvent(msg);
+            else if (topic.endsWith('/status')) handleStatus(msg);
+        } catch(e) {}
+    });
+
+    client.on('error', (e) => {
+        document.getElementById('connInfo').textContent = '❌ 连接失败';
+        document.getElementById('mqttStatus').innerHTML = '<span class="dot dot-off"></span>MQTT 断开';
+    });
+
+    client.on('close', () => {
+        document.getElementById('mqttStatus').innerHTML = '<span class="dot dot-off"></span>MQTT 断开';
+        document.getElementById('connInfo').textContent = '已断开';
+    });
+}
+
+/* ============ 数据处理 ============ */
+function handleData(msg) {
+    const d = msg.data;
+    const ctrl = msg.ctrl;
+
+    document.getElementById('soil1').textContent    = d.soil[0]?.toFixed(1) ?? '--';
+    document.getElementById('soil2').textContent    = d.soil[1]?.toFixed(1) ?? '--';
+    document.getElementById('soilTemp').textContent = d.soil_temp?.toFixed(1) ?? '--';
+    document.getElementById('temp').textContent     = d.temp?.toFixed(1) ?? '--';
+    document.getElementById('humi').textContent     = d.humi?.toFixed(1) ?? '--';
+    document.getElementById('lux').textContent      = d.lux ?? '--';
+    document.getElementById('rain').textContent     = d.rain ? '🌧 下雨' : '☀ 无雨';
+
+    /* NPK */
+    const npk = d.npk || {};
+    document.getElementById('npkN').textContent = npk.valid ? npk.n : '--';
+    document.getElementById('npkP').textContent = npk.valid ? npk.p : '--';
+    document.getElementById('npkK').textContent = npk.valid ? npk.k : '--';
+
+    /* NPK 贫瘠上色 */
+    ['npkN','npkP','npkK'].forEach(id => {
+        const el = document.getElementById(id);
+        const v = parseInt(el.textContent);
+        if (v !== v) return;  // NaN
+        el.style.color = v < 30 ? '#ef4444' : v < 60 ? '#f59e0b' : '#e2e8f0';
+    });
+
+    document.getElementById('pumpState').textContent = ctrl.pump ? '🟢 运行中' : '⚫ 关闭';
+    document.getElementById('ledState').textContent  = ctrl.led  ? '🟢 开启'   : '⚫ 关闭';
+    document.getElementById('fanState').textContent  = ctrl.fan  ? '🟢 运行中' : '⚫ 关闭';
+
+    const now = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    history.time.push(now);
+    history.soil1.push(d.soil[0] ?? null);
+    history.soil2.push(d.soil[1] ?? null);
+    history.temp.push(d.temp ?? null);
+    history.humi.push(d.humi ?? null);
+    if (history.time.length > MAX_HISTORY) {
+        history.time.shift(); history.soil1.shift(); history.soil2.shift();
+        history.temp.shift(); history.humi.shift();
+    }
+    chart.data.labels = history.time;
+    chart.data.datasets[0].data = history.soil1;
+    chart.data.datasets[1].data = history.soil2;
+    chart.data.datasets[2].data = history.temp;
+    chart.data.datasets[3].data = history.humi;
+    chart.update('none');
+}
+
+function notify(title, body) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') { new Notification(title, { body, icon: '🌱' }); }
+    else if (Notification.permission !== 'denied') { Notification.requestPermission(); }
+}
+
+function handleEvent(msg) {
+    if (msg.type === 'alarm') {
+        console.warn('⚠️ 告警:', msg.code, msg.msg);
+        notify('🚨 ' + msg.code, msg.msg || '传感器数据异常');
+    }
+}
+
+function handleStatus(msg) {
+    // 设备心跳状态更新
+}
+
+/* ============ 发送指令 ============ */
+function sendCmd(cmd) {
+    if (!client || !client.connected) { alert('请先连接 MQTT'); return; }
+    const dev = document.getElementById('deviceId').value || DEVICE;
+    const payload = JSON.stringify({ cmd: cmd, ts: Math.floor(Date.now() / 1000) });
+    client.publish(`vegfield/${dev}/cmd`, payload, { qos: 1 });
+    console.log('📤 发送指令:', cmd);
+}
+
+/* ============ 页面加载自动连接 ============ */
+window.onload = () => { doConnect(); };
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# STM32 / Keil build artifacts
+*.o
+*.d
+*.crf
+*.htm
+*.dep
+*.lnp
+*.axf
+*.hex
+*.bin
+*.elf
+*.map
+*.iex
+*.lst
+*.sct
+*.build_log.htm
+*.tra
+*.Administrator
+JLinkLog.txt
+*.uvguix.*
+*.scvd
+Objects/
+Listings/
+DebugConfig/
+RTE/
+
+# IDE
+.vscode/
+.idea/
+*.uvoptx
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
