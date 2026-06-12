@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能菜地监控系统</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--accent:#22c55e;--text:#e2e8f0;--sub:#94a3b8;--danger:#ef4444;--warn:#f59e0b}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:12px}
+.header{text-align:center;padding:16px 0;border-bottom:1px solid #334155;margin-bottom:16px}
+.header h1{font-size:1.4rem;color:var(--accent)}
+.header .status{font-size:.8rem;color:var(--sub);margin-top:4px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.dot-on{background:var(--accent)}.dot-off{background:var(--danger)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.card{background:var(--card);border-radius:10px;padding:14px;text-align:center}
+.card .label{font-size:.75rem;color:var(--sub);text-transform:uppercase}
+.card .value{font-size:1.8rem;font-weight:700;margin:6px 0}
+.card .unit{font-size:.7rem;color:var(--sub)}
+.card.soil .value{color:#60a5fa}.card.temp .value{color:#f97316}
+.card.humi .value{color:#38bdf8}.card.light .value{color:#fbbf24}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
+.ctrl-card{background:var(--card);border-radius:10px;padding:14px;text-align:center}
+.ctrl-card .name{font-weight:600;margin-bottom:8px}
+.ctrl-card .state{font-size:.8rem;margin-bottom:8px}
+.btn{border:none;border-radius:6px;padding:8px 16px;font-size:.85rem;font-weight:600;cursor:pointer;margin:2px 4px}
+.btn-on{background:var(--accent);color:#000}.btn-off{background:#475569;color:#e2e8f0}
+.chart-box{background:var(--card);border-radius:10px;padding:14px;margin-top:10px}
+.chart-box canvas{max-height:200px}
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.info-item{background:var(--card);border-radius:8px;padding:10px;text-align:center;font-size:.75rem;color:var(--sub)}
+.info-item span{display:block;font-size:.9rem;color:var(--text);font-weight:600}
+.footer{text-align:center;font-size:.7rem;color:#475569;margin-top:12px}
+@media(max-width:480px){.grid{grid-template-columns:repeat(2,1fr)}.controls{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🌱 智能菜地监控系统</h1>
+    <div class="status">
+        <span id="connStatus"><span class="dot dot-on"></span>串口已连接</span>
+        &nbsp;|&nbsp; 设备: <strong>vegfield_001</strong>
+    </div>
+</div>
+
+<div id="alarmBar" style="display:none;background:#7f1d1d;color:#fecaca;text-align:center;padding:10px;border-radius:8px;margin:8px 0;font-weight:700;font-size:1rem"></div>
+
+<div class="grid">
+    <div class="card soil"><div class="label">土壤湿度</div>
+        <div class="value" id="soil">--</div><div class="unit" id="soil_u">DRY</div></div>
+    <div class="card temp"><div class="label">空气温度</div>
+        <div class="value" id="temp">--</div><div class="unit">°C</div></div>
+    <div class="card humi"><div class="label">空气湿度</div>
+        <div class="value" id="humi">--</div><div class="unit">%RH</div></div>
+    <div class="card light"><div class="label">光照强度</div>
+        <div class="value" id="lux">--</div><div class="unit">lux</div></div>
+</div>
+
+<div class="controls">
+    <div class="ctrl-card">
+        <div class="name">💧 浇水喷头</div>
+        <div class="state" id="pumpState">⚫ 关闭</div>
+        <button class="btn btn-on" onclick="sendCmd('pump_on')">开启</button>
+        <button class="btn btn-off" onclick="sendCmd('pump_off')">关闭</button>
+    </div>
+    <div class="ctrl-card">
+        <div class="name">💡 补光灯</div>
+        <div class="state" id="ledState">⚫ 关闭</div>
+        <button class="btn btn-on" onclick="sendCmd('led_on')">开启</button>
+        <button class="btn btn-off" onclick="sendCmd('led_off')">关闭</button>
+    </div>
+    <div class="ctrl-card">
+        <div class="name">🌀 风扇</div>
+        <div class="state" id="fanState">⚫ 关闭</div>
+        <button class="btn btn-on" onclick="sendCmd('fan_on')">开启</button>
+        <button class="btn btn-off" onclick="sendCmd('fan_off')">关闭</button>
+    </div>
+    <div class="ctrl-card">
+        <div class="name">🕶 遮光网</div>
+        <div class="state" id="shadeState">⚫ 关闭</div>
+        <button class="btn btn-on" onclick="sendCmd('shade_on')">开启</button>
+        <button class="btn btn-off" onclick="sendCmd('shade_off')">关闭</button>
+    </div>
+    <div class="ctrl-card">
+        <div class="name">🔔 蜂鸣器</div>
+        <div class="state" id="buzzState">🔇 静音</div>
+        <button class="btn btn-on" onclick="sendCmd('buzz_on')">开启</button>
+        <button class="btn btn-off" onclick="sendCmd('buzz_off')">关闭</button>
+    </div>
+</div>
+
+<div style="text-align:center;margin:8px 0">
+  当前模式: <strong id="modeLabel">AUTO</strong>
+  <button class="btn btn-on" onclick="sendCmd('auto_mode')">切换为自动</button>
+  <button class="btn btn-off" onclick="sendCmd('manual_mode')">切换为手动</button>
+</div>
+
+<div class="chart-box"><canvas id="chart"></canvas></div>
+
+<div class="info-grid">
+    <div class="info-item">连接 <span id="connOk">串口</span></div>
+    <div class="info-item">更新次数 <span id="updateCount">0</span></div>
+    <div class="info-item">数据状态 <span id="dataOk">--</span></div>
+</div>
+
+<div class="footer">Smart Vegetable Field v1.0 | STM32F407 + FreeRTOS</div>
+
+<script>
+let history={soil:[],temp:[],humi:[],time:[]};
+const MAX=30;
+
+const ctx=document.getElementById('chart').getContext('2d');
+let chart=new Chart(ctx,{
+    type:'line',
+    data:{labels:[],datasets:[
+        {label:'土壤',data:[],borderColor:'#60a5fa',tension:.2,pointRadius:0},
+        {label:'温度(C)',data:[],borderColor:'#f97316',tension:.2,pointRadius:0,hidden:true},
+        {label:'湿度(%)',data:[],borderColor:'#38bdf8',tension:.2,pointRadius:0,hidden:true}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+        scales:{x:{ticks:{color:'#64748b',maxTicksLimit:8}},y:{min:0,max:100,ticks:{color:'#64748b'}}},
+        plugins:{legend:{labels:{color:'#94a3b8',usePointStyle:true,boxWidth:8}}}}
+});
+
+let count=0;
+async function poll(){
+    try{
+        let r=await fetch('/api/sensors');
+        // check if it's actual JSON (not HTML error page)
+        let text = await r.text();
+        let d = JSON.parse(text);
+        if(!d.data) return;
+        count++;
+        let data=d.data, ctrl=d.ctrl||{};
+        document.getElementById('soil').textContent=(data.soil[0]||0).toFixed(0);
+        let s=data.soil[0]||100;
+        document.getElementById('soil_u').textContent=s>85?'DRY':s>40?'MOIST':s>15?'WET':'WATER!';
+        document.getElementById('temp').textContent=(data.temp||0).toFixed(1);
+        document.getElementById('humi').textContent=(data.humi||0).toFixed(1);
+        document.getElementById('lux').textContent=data.lux||0;
+        document.getElementById('pumpState').innerHTML=ctrl.pump?'🟢 运行中':'⚫ 关闭';
+        document.getElementById('ledState').innerHTML=ctrl.led?'🟢 开启':'⚫ 关闭';
+        document.getElementById('fanState').innerHTML=ctrl.fan?'🟢 运行中':'⚫ 关闭';
+        document.getElementById('shadeState').innerHTML=ctrl.shade?'🟢 已遮光':'⚫ 关闭';
+        document.getElementById('buzzState').innerHTML=ctrl.buzz?'🔔 报警中':'🔇 静音';
+        document.getElementById('dataOk').textContent=data.temp?'正常':'等待数据';
+        document.getElementById('updateCount').textContent=count;
+        document.getElementById('modeLabel').textContent=ctrl.mode?'AUTO':'MANUAL';
+        document.getElementById('modeLabel').style.color=ctrl.mode?'#22c55e':'#f59e0b';
+        let a=(d.alarm||{});
+        let ab=document.getElementById('alarmBar');
+        if(a.active){
+            let reasons=[];
+            if(a.soil_dry)reasons.push('土壤干燥');
+            if(a.temp_high)reasons.push('温度过高');
+            if(reasons.length)ab.textContent='🚨 报警: '+reasons.join(', ');
+            ab.style.display='block';
+        }else{ab.style.display='none';}
+
+        let now=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        history.time.push(now);history.soil.push(data.soil[0]||0);
+        history.temp.push(data.temp||0);history.humi.push(data.humi||0);
+        if(history.time.length>MAX){history.time.shift();history.soil.shift();history.temp.shift();history.humi.shift();}
+        chart.data.labels=history.time;
+        chart.data.datasets[0].data=history.soil;
+        chart.data.datasets[1].data=history.temp;
+        chart.data.datasets[2].data=history.humi;
+        chart.update('none');
+    }catch(e){
+        document.getElementById('connStatus').innerHTML='<span class="dot dot-off"></span>未连接';
+    }
+}
+setInterval(poll,2000);
+
+function sendCmd(cmd){
+    console.log('CMD:',cmd);
+    fetch('/api/sensors',{method:'POST',body:JSON.stringify({cmd})});
+}
+poll();
+</script>
+</body>
+</html>
