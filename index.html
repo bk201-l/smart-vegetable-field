@@ -57,25 +57,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 </div>
 
 <div class="controls">
-    <div class="ctrl-card">
-        <div class="name">💧 浇水喷头</div><div class="state" id="pumpState">⚫ 关闭</div>
-    </div>
-    <div class="ctrl-card">
-        <div class="name">💡 补光灯</div><div class="state" id="ledState">⚫ 关闭</div>
-    </div>
-    <div class="ctrl-card">
-        <div class="name">🌀 风扇</div><div class="state" id="fanState">⚫ 关闭</div>
-    </div>
-    <div class="ctrl-card">
-        <div class="name">🕶 遮光网</div><div class="state" id="shadeState">⚫ 关闭</div>
-    </div>
-    <div class="ctrl-card">
-        <div class="name">🔔 蜂鸣器</div><div class="state" id="buzzState">🔇 静音</div>
-    </div>
-    <div class="ctrl-card">
-        <div class="name">🤖 模式</div><div class="state" id="modeLabel">AUTO</div>
-    </div>
+    <div class="ctrl-card"><div class="name">💧 浇水喷头</div><div class="state" id="pumpState">⚫</div></div>
+    <div class="ctrl-card"><div class="name">💡 补光灯</div><div class="state" id="ledState">⚫</div></div>
+    <div class="ctrl-card"><div class="name">🌀 风扇</div><div class="state" id="fanState">⚫</div></div>
+    <div class="ctrl-card"><div class="name">🕶 遮光网</div><div class="state" id="shadeState">⚫</div></div>
+    <div class="ctrl-card"><div class="name">🔔 蜂鸣器</div><div class="state" id="buzzState">🔇</div></div>
+    <div class="ctrl-card"><div class="name">🤖 模式</div><div class="state" id="modeLabel">AUTO</div></div>
 </div>
+<div style="text-align:center;font-size:.7rem;color:var(--sub);margin:4px 0">⚠️ 控制请用 HTTP 本地版 localhost:8080</div>
 
 <div class="chart-box"><canvas id="chart"></canvas></div>
 
@@ -116,13 +105,13 @@ client.on('message',(topic,payload)=>{
             document.getElementById('temp').textContent=(d.temp||0).toFixed(1);
             document.getElementById('humi').textContent=(d.humi||0).toFixed(1);
             document.getElementById('lux').textContent=d.lux||0;
-            document.getElementById('pumpState').innerHTML=c.pump?'🟢 运行中':'⚫ 关闭';
-            document.getElementById('ledState').innerHTML=c.led?'🟢 开启':'⚫ 关闭';
-            document.getElementById('fanState').innerHTML=c.fan?'🟢 运行中':'⚫ 关闭';
+            document.getElementById('pumpState').innerHTML=c.pump?'🟢 运行':'⚫ 关';
+            document.getElementById('ledState').innerHTML=c.led?'🟢 开':'⚫ 关';
+            document.getElementById('fanState').innerHTML=c.fan?'🟢 运行':'⚫ 关';
             let shade=c.shade||false, buzz=c.buzz||false, mode=c.mode!==undefined?c.mode:true;
-            document.getElementById('shadeState').innerHTML=shade?'🟢 已遮光':'⚫ 关闭';
-            document.getElementById('buzzState').innerHTML=buzz?'🔔 报警中':'🔇 静音';
-            document.getElementById('modeLabel').textContent=mode?'AUTO':'MANUAL';
+            document.getElementById('shadeState').innerHTML=shade?'🟢 遮光':'⚫ 关';
+            document.getElementById('buzzState').innerHTML=buzz?'🔔 报警':'🔇 静音';
+            document.getElementById('modeLabel').textContent=mode?'AUTO':'手动';
             document.getElementById('modeLabel').style.color=mode?'#22c55e':'#f59e0b';
             document.getElementById('dataOk').textContent=d.temp?'正常':'等待数据';
             document.getElementById('updateCount').textContent=count;
