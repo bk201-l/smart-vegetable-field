@@ -57,14 +57,19 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 </div>
 
 <div class="controls">
-    <div class="ctrl-card"><div class="name">💧 浇水喷头</div><div class="state" id="pumpState">⚫</div></div>
-    <div class="ctrl-card"><div class="name">💡 补光灯</div><div class="state" id="ledState">⚫</div></div>
-    <div class="ctrl-card"><div class="name">🌀 风扇</div><div class="state" id="fanState">⚫</div></div>
-    <div class="ctrl-card"><div class="name">🕶 遮光网</div><div class="state" id="shadeState">⚫</div></div>
-    <div class="ctrl-card"><div class="name">🔔 蜂鸣器</div><div class="state" id="buzzState">🔇</div></div>
-    <div class="ctrl-card"><div class="name">🤖 模式</div><div class="state" id="modeLabel">AUTO</div></div>
+    <div class="ctrl-card"><div class="name">💧 浇水喷头</div><div class="state" id="pumpState">⚫</div>
+    <button class="btn btn-on" onclick="sendCmd('pump_on')">开</button><button class="btn btn-off" onclick="sendCmd('pump_off')">关</button></div>
+    <div class="ctrl-card"><div class="name">💡 补光灯</div><div class="state" id="ledState">⚫</div>
+    <button class="btn btn-on" onclick="sendCmd('led_on')">开</button><button class="btn btn-off" onclick="sendCmd('led_off')">关</button></div>
+    <div class="ctrl-card"><div class="name">🌀 风扇</div><div class="state" id="fanState">⚫</div>
+    <button class="btn btn-on" onclick="sendCmd('fan_on')">开</button><button class="btn btn-off" onclick="sendCmd('fan_off')">关</button></div>
+    <div class="ctrl-card"><div class="name">🕶 遮光网</div><div class="state" id="shadeState">⚫</div>
+    <button class="btn btn-on" onclick="sendCmd('shade_on')">开</button><button class="btn btn-off" onclick="sendCmd('shade_off')">关</button></div>
+    <div class="ctrl-card"><div class="name">🔔 蜂鸣器</div><div class="state" id="buzzState">🔇</div>
+    <button class="btn btn-on" onclick="sendCmd('buzz_on')">开</button><button class="btn btn-off" onclick="sendCmd('buzz_off')">关</button></div>
+    <div class="ctrl-card"><div class="name">🤖 模式</div><div class="state" id="modeLabel">AUTO</div>
+    <button class="btn btn-on" onclick="sendCmd('auto_mode')">自动</button><button class="btn btn-off" onclick="sendCmd('manual_mode')">手动</button></div>
 </div>
-<div style="text-align:center;font-size:.7rem;color:var(--sub);margin:4px 0">⚠️ 控制请用 HTTP 本地版 localhost:8080</div>
 
 <div class="chart-box"><canvas id="chart"></canvas></div>
 
@@ -140,6 +145,12 @@ client.on('message',(topic,payload)=>{
 });
 client.on('error',()=>{document.getElementById('mqttStatus').innerHTML='<span class="dot dot-off"></span>MQTT 断开';});
 client.on('close',()=>{document.getElementById('mqttStatus').innerHTML='<span class="dot dot-off"></span>MQTT 断开';});
+
+function sendCmd(cmd){
+    if(!client||!client.connected){console.log('MQTT not connected');return;}
+    client.publish('vegfield/vegfield_001/cmd',JSON.stringify({cmd:cmd,ts:Date.now()}));
+    console.log('CMD:',cmd);
+}
 </script>
 </body>
 </html>

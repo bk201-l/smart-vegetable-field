@@ -10,14 +10,36 @@ BROKER = "broker.emqx.io"
 PORT = 1883
 TOPIC_DATA = "vegfield/vegfield_001/data"
 TOPIC_EVENT = "vegfield/vegfield_001/event"
+TOPIC_CMD = "vegfield/vegfield_001/cmd"
 
 latest = {}
+ser_cmd = None
+
+def on_connect(client, userdata, flags, rc):
+    print(f"[MQTT] Connected (rc={rc})")
+    client.subscribe(TOPIC_CMD)
+    print(f"[MQTT] Subscribed to {TOPIC_CMD}")
+
+def on_message(client, userdata, msg):
+    global ser_cmd
+    try:
+        payload = json.loads(msg.payload.decode())
+        cmd = payload.get("cmd", "")
+        xlat = {"pump_on":"pump1","pump_off":"pump0","led_on":"lite1","led_off":"lite0",
+                "fan_on":"fan1","fan_off":"fan0","shade_on":"shad1","shade_off":"shad0",
+                "buzz_on":"buzz1","buzz_off":"buzz0","auto_mode":"auto1","manual_mode":"manu"}
+        mcucmd = xlat.get(cmd, cmd)
+        if ser_cmd and ser_cmd.is_open:
+            ser_cmd.write((mcucmd+'\n').encode())
+            print(f"[CMD] {cmd} -> {mcucmd}")
+    except: pass
 
 def serial_reader():
-    global latest
+    global latest, ser_cmd
     while True:
         try:
             ser = serial.Serial('COM7', 115200, timeout=2)
+            ser_cmd = ser
             print(f"[Serial] COM7")
             while True:
                 line = ser.readline().decode('utf-8', errors='ignore').strip()
@@ -68,6 +90,8 @@ def mqtt_loop():
 if __name__ == '__main__':
     print("=== MQTT Bridge ===")
     client = mqtt.Client(client_id="vegfield_py")
+    client.on_connect = on_connect
+    client.on_message = on_message
     client.connect(BROKER, PORT, 60)
     client.loop_start()
     threading.Thread(target=serial_reader, daemon=True).start()
