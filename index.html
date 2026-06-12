@@ -82,14 +82,19 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 <div class="footer">Smart Vegetable Field v1.0 | STM32F407</div>
 
 <script>
-let count=0, history={soil:[],temp:[],humi:[],time:[]}, MAX=30;
+let count=0, history={soil:[],temp:[],humi:[],lux:[],time:[]}, MAX=30;
 const ctx=document.getElementById('chart').getContext('2d');
 let chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[
-    {label:'土壤(%)',data:[],borderColor:'#60a5fa',tension:.2,pointRadius:0},
-    {label:'温度(C)',data:[],borderColor:'#f97316',tension:.2,pointRadius:0,hidden:true},
-    {label:'湿度(%)',data:[],borderColor:'#38bdf8',tension:.2,pointRadius:0,hidden:true}
+    {label:'土壤(%)',data:[],borderColor:'#60a5fa',tension:.2,pointRadius:0,yAxisID:'y'},
+    {label:'温度(C)',data:[],borderColor:'#f97316',tension:.2,pointRadius:0,hidden:true,yAxisID:'y'},
+    {label:'湿度(%)',data:[],borderColor:'#38bdf8',tension:.2,pointRadius:0,hidden:true,yAxisID:'y'},
+    {label:'光照(lux)',data:[],borderColor:'#fbbf24',tension:.2,pointRadius:0,yAxisID:'y1'}
 ]},options:{responsive:true,maintainAspectRatio:false,
-    scales:{x:{ticks:{color:'#64748b',maxTicksLimit:8}},y:{min:0,max:100,ticks:{color:'#64748b'}}},
+    scales:{
+        x:{ticks:{color:'#64748b',maxTicksLimit:8}},
+        y:{type:'linear',position:'left',min:0,max:100,ticks:{color:'#64748b'}},
+        y1:{type:'linear',position:'right',min:0,ticks:{color:'#fbbf24'},grid:{display:false}}
+    },
     plugins:{legend:{labels:{color:'#94a3b8'}}}}});
 
 let client=mqtt.connect('wss://broker.emqx.io:8084/mqtt',{clientId:'web_'+Math.random().toString(16).slice(2,10),keepalive:60,clean:true});
@@ -133,12 +138,13 @@ client.on('message',(topic,payload)=>{
             }else{ab.style.display='none';}
 
             let now=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-            history.time.push(now);history.soil.push(s);history.temp.push(d.temp||0);history.humi.push(d.humi||0);
-            if(history.time.length>MAX){history.time.shift();history.soil.shift();history.temp.shift();history.humi.shift();}
+            history.time.push(now);history.soil.push(s);history.temp.push(d.temp||0);history.humi.push(d.humi||0);history.lux.push(d.lux||0);
+            if(history.time.length>MAX){history.time.shift();history.soil.shift();history.temp.shift();history.humi.shift();history.lux.shift();}
             chart.data.labels=history.time;
             chart.data.datasets[0].data=history.soil;
             chart.data.datasets[1].data=history.temp;
             chart.data.datasets[2].data=history.humi;
+            chart.data.datasets[3].data=history.lux;
             chart.update('none');
         }
     }catch(e){}
