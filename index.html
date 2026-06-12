@@ -96,7 +96,7 @@ let chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[
     {label:'湿度(%)',data:[],borderColor:'#38bdf8',tension:.2,pointRadius:0,hidden:true}
 ]},options:{responsive:true,maintainAspectRatio:false,
     scales:{x:{ticks:{color:'#64748b',maxTicksLimit:8}},y:{min:0,max:100,ticks:{color:'#64748b'}}},
-    plugins:{legend:{labels:{color:'#94a3b8',usePointStyle:true,boxWidth:8}}}});
+    plugins:{legend:{labels:{color:'#94a3b8'}}}}});
 
 let client=mqtt.connect('wss://broker.emqx.io:8084/mqtt',{clientId:'web_'+Math.random().toString(16).slice(2,10),keepalive:60,clean:true});
 client.on('connect',()=>{
